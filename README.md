@@ -1,4 +1,3 @@
-Got it! Here's a README file for the **ft_shield** project based on the document you provided:
 
 ---
 
@@ -92,4 +91,3 @@ This project is licensed under the **MIT License**. See the LICENSE file for det
 
 ---
 
-Let me know if you'd like any modifications! 🚀
