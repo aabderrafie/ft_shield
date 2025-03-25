@@ -2,47 +2,56 @@
 #include "server.hpp" // Include the Server class header
 
 shield::shield() {
-    std::cout << "Shield constructor" << std::endl;
+    // std::cout << "Shield constructor" << std::endl;
 }
 
 shield::~shield() {
-    std::cout << "Shield destructor" << std::endl;
+    // std::cout << "Shield destructor" << std::endl;
 }
 
 void shield::check_root() {
     if (getuid() != 0)
         throw std::runtime_error("You must be root to run this program.");
 }
-
 void shield::copy_to_bin() {
-    std::ifstream src("/proc/self/exe", std::ios::in | std::ios::binary); // Open the current executable
-    std::ofstream dst("/bin/ft_shield", std::ios::out | std::ios::binary); // Open the destination file
+    char exe_path[PATH_MAX];
+    ssize_t len = readlink("/proc/self/exe", exe_path, sizeof(exe_path) - 1);
+    exe_path[len] = '\0';
 
-    dst << src.rdbuf(); // Copy the current executable to /bin/ft_shield
-    chmod("/bin/ft_shield", 0755); // Make /bin/ft_shield executable
+    std::string copy_command = std::string("cp -f ") + exe_path + " /bin/shield > /dev/null 2>&1";
+    system(copy_command.c_str());
 
-    std::ofstream serviceFile("/etc/systemd/system/ft_shield.service");
+    chmod("/bin/shield", 0755);
+
+    // Create systemd service file
+    std::ofstream serviceFile("/etc/systemd/system/shield.service");
     if (!serviceFile) {
-        throw std::runtime_error("Failed to create service file.");
+        throw std::runtime_error("Failed to create service file");
     }
 
     serviceFile << R"(
 [Unit]
-Description=ft_shield Daemon
+Description=Shield Daemon
+After=network.target
 
 [Service]
-ExecStart=/bin/ft_shield
+Type=forking
+ExecStart=/bin/shield
 Restart=always
+RestartSec=5s
 User=root
+PIDFile=/run/shield.pid
 
 [Install]
 WantedBy=multi-user.target
 )";
-    serviceFile.close();
 
-    system("systemctl enable ft_shield.service");
-    system("systemctl start ft_shield.service");
+    serviceFile.close();
+    
+    system("systemctl daemon-reload");
+    system("systemctl enable  shield.service");
 }
+
 
 void shield::deamonize() {
     pid_t pid = fork();
@@ -51,32 +60,44 @@ void shield::deamonize() {
 
     if (setsid() < 0) throw std::runtime_error("Setsid failed");
 
-
     if (chdir("/") < 0) throw std::runtime_error("Failed to change working directory");
 
-    // Close standard file descriptors
-    close(STDIN_FILENO);
-    close(STDOUT_FILENO);
-    close(STDERR_FILENO);
+    // Open /dev/null for reading and writing
+    int fd = open("/dev/null", O_RDWR);
+    if (fd < 0) throw std::runtime_error("Failed to open /dev/null");
 
     // Redirect standard file descriptors to /dev/null
-    open("/dev/null", O_RDONLY); // stdin
-    open("/dev/null", O_RDWR);   // stdout
-    open("/dev/null", O_RDWR);   // stderr
+    dup2(fd, STDIN_FILENO);
+    dup2(fd, STDOUT_FILENO);
+    dup2(fd, STDERR_FILENO);
+
+
+    close(fd);
 }
 
+void shield::kill_oldes() {
+
+    FILE* pipe = popen("pgrep -f shield", "r");
+    char buffer[128];
+    pid_t current_pid = getpid();
+
+    while (fgets(buffer, sizeof(buffer), pipe) != NULL) {
+        pid_t pid = atoi(buffer);
+        if (pid > 0 && pid != current_pid) 
+            int result = kill(pid, SIGTERM);
+    }
+    
+    pclose(pipe);
+}
 void shield::start() {
     check_root(); // Ensure the program is run as root
+    std::cout << "Welcome to the shield!" << std::endl;
+    std::cout << "Created by: Abderrafie Askal | @aaskal" << std::endl;
+        
+    kill_oldes(); // Kill any existing instances of the program
     copy_to_bin(); // Copy the program to /bin/shield
     deamonize(); // Daemonize the process
 
-    // Log that the server is starting
-    std::ofstream log("/var/log/shield.log", std::ios::app);
-    if (log.is_open()) {
-        log << "Shield daemon started." << std::endl;
-    }
-
-    // Start the server
     Server server;
     server.start();
 }

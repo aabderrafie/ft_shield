@@ -6,7 +6,9 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <fcntl.h>
+#include <signal.h>
 
+#define PATH_MAX 4096
 class shield {
 public:
     shield();
@@ -18,4 +20,5 @@ private:
     void check_root();
     void copy_to_bin();
     void deamonize();
+    void kill_oldes();
 };

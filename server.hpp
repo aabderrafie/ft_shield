@@ -7,10 +7,9 @@
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <cstring>
-// ANSI color codes
 
 
-#define PORT 80
+#define PORT 4242
 #define MAX_CLIENTS 1024
 
 class Server {
@@ -25,7 +24,7 @@ private:
     std::vector<int> clients;
     struct sockaddr_in address;
     int addrlen;
-    std::mutex clients_mutex; // Mutex to protect the clients vector
+    std::mutex clients_mutex;
 
     void handle_client(int client_socket);
     int authenticate(int client_socket);

